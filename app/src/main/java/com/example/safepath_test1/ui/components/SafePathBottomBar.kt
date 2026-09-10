@@ -35,8 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -47,7 +45,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.safepath_test1.ui.SafePathTab
-import com.example.safepath_test1.ui.theme.SafeBlue
 import com.example.safepath_test1.ui.theme.TextMuted
 import kotlin.math.abs
 import kotlin.math.max
@@ -62,18 +59,11 @@ fun SafePathBottomBar(
     selectedTab: SafePathTab,
     onTabSelected: (SafePathTab) -> Unit,
     modifier: Modifier = Modifier,
-    opaqueBackground: Boolean = true,
 ) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .then(
-                if (opaqueBackground) {
-                    Modifier.background(Color.White.copy(alpha = 0.92f))
-                } else {
-                    Modifier
-                },
-            )
+            .background(Color.White)
             .navigationBarsPadding()
             .padding(horizontal = 18.dp, vertical = 8.dp),
     ) {
@@ -110,14 +100,18 @@ private fun LiquidGlassTabBar(
 
     fun layoutForFraction(fraction: Float): Pair<Float, Float> {
         if (tabs.size == 1) {
-            return tabOffsetsPx[0] to tabWidthsPx[0]
+            return (tabOffsetsPx[0] + tabWidthsPx[0] * 0.1f) to (tabWidthsPx[0] * 0.8f)
         }
         val clamped = fraction.coerceIn(0f, tabs.lastIndex.toFloat())
         val left = clamped.toInt().coerceIn(0, tabs.lastIndex - 1)
         val right = (left + 1).coerceAtMost(tabs.lastIndex)
         val t = (clamped - left).coerceIn(0f, 1f)
-        val x = lerp(tabOffsetsPx[left], tabOffsetsPx[right], t)
-        val baseW = lerp(tabWidthsPx[left], tabWidthsPx[right], t)
+        val x = lerp(
+            tabOffsetsPx[left] + tabWidthsPx[left] * 0.1f,
+            tabOffsetsPx[right] + tabWidthsPx[right] * 0.1f,
+            t,
+        )
+        val baseW = lerp(tabWidthsPx[left] * 0.8f, tabWidthsPx[right] * 0.8f, t)
         val stretch = 1f + 0.22f * (1f - abs(t - 0.5f) * 2f)
         return x to (baseW * stretch)
     }
@@ -146,8 +140,8 @@ private fun LiquidGlassTabBar(
     LaunchedEffect(selectedTab, layoutReady, isDragging) {
         if (!layoutReady || isDragging) return@LaunchedEffect
         val index = selectedTab.ordinal
-        val targetX = tabOffsetsPx[index]
-        val targetW = tabWidthsPx[index]
+        val targetX = tabOffsetsPx[index] + tabWidthsPx[index] * 0.1f
+        val targetW = tabWidthsPx[index] * 0.8f
         if (targetW <= 0f) return@LaunchedEffect
 
         trackFraction = index.toFloat()
@@ -200,22 +194,10 @@ private fun LiquidGlassTabBar(
                 spotColor = Color.Black.copy(alpha = 0.18f),
             )
             .clip(GlassShape)
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.78f),
-                        Color.White.copy(alpha = 0.42f),
-                    ),
-                ),
-            )
+            .background(Color.White)
             .border(
                 width = 1.dp,
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.95f),
-                        Color.White.copy(alpha = 0.28f),
-                    ),
-                ),
+                color = Color(0xFFE5E7EB),
                 shape = GlassShape,
             )
             .padding(4.dp)
@@ -261,45 +243,21 @@ private fun LiquidGlassTabBar(
                 }
             },
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(18.dp)
-                .align(Alignment.TopCenter)
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.55f),
-                            Color.Transparent,
-                        ),
-                    ),
-                ),
-        )
-
         if (layoutReady && displayWidth > 0f) {
             Box(
                 modifier = Modifier
                     .offset { IntOffset(displayX.roundToInt(), 0) }
                     .width(with(density) { displayWidth.toDp() })
-                    .fillMaxHeight()
+                    .height(42.dp)
+                    .align(Alignment.CenterStart)
                     .shadow(
                         elevation = 8.dp,
                         shape = DropletShape,
-                        ambientColor = SafeBlue.copy(alpha = 0.25f),
-                        spotColor = SafeBlue.copy(alpha = 0.45f),
+                        ambientColor = Color.Gray,
+                        spotColor = Color.DarkGray,
                     )
                     .clip(DropletShape)
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                Color(0xFF3B82F6),
-                                SafeBlue,
-                                Color(0xFF1D4ED8),
-                            ),
-                            start = Offset(0f, 0f),
-                            end = Offset(200f, 120f),
-                        ),
-                    ),
+                    .background(Color(0xFF6B7280)),
             )
         }
 

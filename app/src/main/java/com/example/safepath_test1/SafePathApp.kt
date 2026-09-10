@@ -106,7 +106,6 @@ fun SafePathApp() {
                     destination = destination,
                     onOriginChanged = { origin = it },
                     onDestinationChanged = { destination = it },
-                    onOpenSettings = { selectedTab = SafePathTab.Settings.name },
                     modifier = Modifier.fillMaxSize(),
                 )
                 SafePathTab.Guardian -> GuardianScreen(
@@ -122,7 +121,6 @@ fun SafePathApp() {
             SafePathBottomBar(
                 selectedTab = tab,
                 onTabSelected = { selectedTab = it.name },
-                opaqueBackground = tab != SafePathTab.Home,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
