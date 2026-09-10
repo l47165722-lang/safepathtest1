@@ -1,7 +1,20 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
 }
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
+}
+
+val mapboxAccessToken = providers.gradleProperty("MAPBOX_ACCESS_TOKEN")
+    .orElse(localProperties.getProperty("MAPBOX_ACCESS_TOKEN") ?: "")
+    .get()
 
 android {
     namespace = "com.example.safepath_test1"
@@ -17,12 +30,13 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        resValue("string", "mapbox_access_token", mapboxAccessToken)
     }
 
     buildTypes {
         release {
             optimization {
-                enable = false
+                enable = true
             }
         }
     }
@@ -32,6 +46,7 @@ android {
     }
     buildFeatures {
         compose = true
+        resValues = true
     }
 }
 
