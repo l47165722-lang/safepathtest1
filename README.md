@@ -67,8 +67,30 @@ safepathtest1/
 │                   └── 📂 theme/                 # 테마 및 컬러
 │                       └── SafePathTheme.kt
 └── 📄 README.md
-```
+---
+📱 Android SDK 및 자바 버전
 
+minSdk: 24 (Android 7.0 Nougat 이상)
+compileSdk: 37 (Android API Level 37)
+targetSdk: 37 (Android API Level 37)
+Java Compatibility: Java 11 (JavaVersion.VERSION_11)
+실행 JDK (Launcher JVM): Java 17 (17.0.19 Microsoft OpenJDK)
+
+⚙️ 빌드 도구 및 언어 버전
+
+Android Gradle Plugin (AGP): 9.3.2
+Gradle: 9.5.0
+Kotlin: 2.0.21
+Jetpack Compose BOM: 2025.03.00
+Activity Compose: 1.10.1
+
+📦 주요 라이브러리 버전
+
+Mapbox Maps SDK: 11.30.0 (com.mapbox.maps:android-ndk27:11.30.0)
+Mapbox Extension Compose: 11.30.0 (com.mapbox.extension:maps-compose-ndk27:11.30.0)
+AndroidX Core KTX: 1.19.0
+AndroidX AppCompat: 1.6.1
+Google Material: 1.10.0
 ---
 
 ## 🚀 시작하기 (Getting Started)
