@@ -1,6 +1,7 @@
 package com.example.safepath_test1.location
 
 import android.content.Context
+import android.util.Log
 import com.mapbox.geojson.Feature
 import com.mapbox.geojson.FeatureCollection
 import com.mapbox.geojson.Point
@@ -33,6 +34,7 @@ data class RadiusAnalysisResult(
 )
 
 object SafetyRepository {
+    private const val tag = "SafetyRepository"
     private var cctvFeatureCollection: FeatureCollection? = null
     private var streetlightFeatureCollection: FeatureCollection? = null
     private var cctvList: List<SafetyFacility>? = null
@@ -104,8 +106,50 @@ object SafetyRepository {
             cctvCount = cctvInRadius,
             streetlightCount = lightsInRadius,
             level = level,
-            totalScore = weightedScore.coerceIn(10, 99),
+            totalScore = weightedScore.coerceIn(0, 100),
         )
+    }
+
+    suspend fun scoreRouteFacilities(context: Context, routeGeoJson: String): Double = withContext(Dispatchers.IO) {
+        val routePoints = try {
+            val coordinates = org.json.JSONObject(routeGeoJson).optJSONArray("coordinates") ?: return@withContext 0.0
+            buildList<SafetyFacility> {
+                for (index in 0 until coordinates.length()) {
+                    val coordinate = coordinates.optJSONArray(index) ?: continue
+                    val longitude = coordinate.optDouble(0, Double.NaN)
+                    val latitude = coordinate.optDouble(1, Double.NaN)
+                    if (latitude.isFinite() && longitude.isFinite()) add(SafetyFacility(latitude, longitude))
+                }
+            }
+        } catch (exception: Exception) {
+            Log.e(tag, "Failed to parse route geometry for facility scoring", exception)
+            return@withContext 0.0
+        }
+        if (routePoints.size < 2) return@withContext 0.0
+        val cctvs = cctvList ?: loadCctv(context).also { cctvList = it }
+        val lights = streetlightList ?: loadStreetlights(context).also { streetlightList = it }
+        if (cctvs.isEmpty() && lights.isEmpty()) return@withContext 0.0
+        return@withContext cctvs.count { isNearRoute(it, routePoints, 50.0) } * 4.0 +
+            lights.count { isNearRoute(it, routePoints, 40.0) }
+    }
+
+    private fun isNearRoute(facility: SafetyFacility, route: List<SafetyFacility>, thresholdMeters: Double): Boolean =
+        route.zipWithNext().any { (start, end) -> distanceToSegmentMeters(facility, start, end) <= thresholdMeters }
+
+    private fun distanceToSegmentMeters(point: SafetyFacility, start: SafetyFacility, end: SafetyFacility): Double {
+        val latitudeScale = 111_320.0
+        val longitudeScale = latitudeScale * Math.cos(Math.toRadians(point.latitude))
+        val px = point.longitude * longitudeScale
+        val py = point.latitude * latitudeScale
+        val sx = start.longitude * longitudeScale
+        val sy = start.latitude * latitudeScale
+        val ex = end.longitude * longitudeScale
+        val ey = end.latitude * latitudeScale
+        val dx = ex - sx
+        val dy = ey - sy
+        val lengthSquared = dx * dx + dy * dy
+        val ratio = if (lengthSquared == 0.0) 0.0 else (((px - sx) * dx + (py - sy) * dy) / lengthSquared).coerceIn(0.0, 1.0)
+        return Math.hypot(px - (sx + ratio * dx), py - (sy + ratio * dy))
     }
 
     private fun distanceInMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
@@ -141,7 +185,8 @@ object SafetyRepository {
                     }
                 }
             }
-        } catch (_: Exception) {
+        } catch (exception: Exception) {
+            Log.e(tag, "Failed to load or parse cctv.csv", exception)
         }
         return list
     }
@@ -166,7 +211,8 @@ object SafetyRepository {
                     }
                 }
             }
-        } catch (_: Exception) {
+        } catch (exception: Exception) {
+            Log.e(tag, "Failed to load or parse streetlight.csv", exception)
         }
         return list
     }

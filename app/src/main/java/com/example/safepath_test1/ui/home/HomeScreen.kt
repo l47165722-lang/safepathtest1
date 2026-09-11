@@ -53,6 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.safepath_test1.model.GeoPoint
+import com.example.safepath_test1.model.PlaceSelection
 import com.example.safepath_test1.ui.map.SafePathMapboxView
 import com.example.safepath_test1.ui.theme.DestRed
 import com.example.safepath_test1.ui.theme.FieldBg
@@ -71,34 +72,33 @@ private enum class RouteType(val title: String, val icon: ImageVector) {
 fun HomeScreen(
     currentLocation: GeoPoint?,
     hasLocationPermission: Boolean,
-    origin: String,
-    destination: String,
-    onOriginChanged: (String) -> Unit,
-    onDestinationChanged: (String) -> Unit,
+    origin: PlaceSelection,
+    destination: PlaceSelection,
+    onOriginChanged: (PlaceSelection) -> Unit,
+    onDestinationChanged: (PlaceSelection) -> Unit,
+    onSwap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     var routeType by rememberSaveable { mutableStateOf(RouteType.Safe.name) }
     var recenterToken by remember { mutableIntStateOf(0) }
     var showSafetyFacilities by rememberSaveable { mutableStateOf(true) }
-    var destinationPoint by remember { mutableStateOf<com.mapbox.geojson.Point?>(null) }
     var multiRouteResult by remember { mutableStateOf<com.example.safepath_test1.location.MultiRouteResult?>(null) }
+    val destinationPoint = if (destination.hasCoordinates()) com.mapbox.geojson.Point.fromLngLat(destination.longitude!!, destination.latitude!!) else null
 
-    LaunchedEffect(destinationPoint, currentLocation) {
-        val point = destinationPoint ?: run {
+    LaunchedEffect(origin, destination) {
+        if (!origin.hasCoordinates() || !destination.hasCoordinates()) {
             multiRouteResult = null
             return@LaunchedEffect
         }
         val token = context.getString(com.example.safepath_test1.R.string.mapbox_access_token)
-        val originLat = currentLocation?.latitude ?: 35.8572
-        val originLng = currentLocation?.longitude ?: 128.5712
-
         val result = com.example.safepath_test1.location.NavigationRepository.fetchMultiRoutes(
+            context = context,
             accessToken = token,
-            originLat = originLat,
-            originLng = originLng,
-            destLat = point.latitude(),
-            destLng = point.longitude(),
+            originLat = origin.latitude!!,
+            originLng = origin.longitude!!,
+            destLat = destination.latitude!!,
+            destLng = destination.longitude!!,
         )
         multiRouteResult = result
     }
@@ -125,10 +125,9 @@ fun HomeScreen(
             routeLineGeoJson = activeRoute?.geoJsonLineString,
             routeLineColor = activeRouteColor,
             onMapClick = { point ->
-                destinationPoint = point
                 val latStr = String.format(java.util.Locale.US, "%.4f", point.latitude())
                 val lngStr = String.format(java.util.Locale.US, "%.4f", point.longitude())
-                onDestinationChanged("선택한 장소 ($latStr, $lngStr)")
+                onDestinationChanged(PlaceSelection("선택한 장소 ($latStr, $lngStr)", point.latitude(), point.longitude()))
             },
             modifier = Modifier.fillMaxSize(),
         )
@@ -142,11 +141,8 @@ fun HomeScreen(
             destination = destination,
             onOriginChanged = onOriginChanged,
             onDestinationChanged = onDestinationChanged,
-            onSwap = {
-                val previousOrigin = origin
-                onOriginChanged(destination)
-                onDestinationChanged(previousOrigin)
-            },
+            onSwap = onSwap,
+            onUseCurrentLocation = { currentLocation?.let { onOriginChanged(PlaceSelection("My location", it.latitude, it.longitude)) } },
             selectedRouteType = RouteType.valueOf(routeType),
             onRouteTypeSelected = { routeType = it.name },
         )
@@ -168,11 +164,12 @@ fun HomeScreen(
 @Composable
 private fun RouteSearchCard(
     modifier: Modifier = Modifier,
-    origin: String,
-    destination: String,
-    onOriginChanged: (String) -> Unit,
-    onDestinationChanged: (String) -> Unit,
+    origin: PlaceSelection,
+    destination: PlaceSelection,
+    onOriginChanged: (PlaceSelection) -> Unit,
+    onDestinationChanged: (PlaceSelection) -> Unit,
     onSwap: () -> Unit,
+    onUseCurrentLocation: () -> Unit,
     selectedRouteType: RouteType,
     onRouteTypeSelected: (RouteType) -> Unit,
 ) {
@@ -224,18 +221,18 @@ private fun RouteSearchCard(
                                 .background(SafeBlue),
                         )
                     },
-                    value = origin,
+                    value = origin.name,
                     placeholder = "내 위치",
                     isSelected = activeTab == "origin",
                     onSelect = { activeTab = "origin" },
-                    onValueChange = onOriginChanged,
+                    onValueChange = { onOriginChanged(PlaceSelection(name = it)) },
                     trailing = {
                         Surface(
                             modifier = Modifier
                                 .size(26.dp)
                                 .clickable {
                                     activeTab = "origin"
-                                    onOriginChanged("내 위치")
+                                    onUseCurrentLocation()
                                 },
                             shape = CircleShape,
                             color = SafeBlue.copy(alpha = 0.12f),
@@ -280,11 +277,11 @@ private fun RouteSearchCard(
                             modifier = Modifier.size(16.dp),
                         )
                     },
-                    value = destination,
+                    value = destination.name,
                     placeholder = "도착지",
                     isSelected = activeTab == "destination",
                     onSelect = { activeTab = "destination" },
-                    onValueChange = onDestinationChanged,
+                    onValueChange = { onDestinationChanged(PlaceSelection(name = it)) },
                     modifier = Modifier.weight(1f),
                 )
             }

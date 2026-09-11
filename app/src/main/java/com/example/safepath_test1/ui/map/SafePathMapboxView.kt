@@ -1,5 +1,6 @@
 package com.example.safepath_test1.ui.map
 
+import android.util.Log
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,6 +39,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 private val SeoulFallback = Point.fromLngLat(126.9780, 37.5665)
+private const val mapTag = "SafePathMapboxView"
 
 @Composable
 fun SafePathMapboxView(
@@ -190,7 +192,8 @@ fun SafePathMapboxView(
                         lineCap(LineCap.ROUND)
                         lineJoin(LineJoin.ROUND)
                     })
-                } catch (_: Exception) {
+                } catch (exception: Exception) {
+                    Log.e(mapTag, "Failed to render route GeoJSON", exception)
                 }
             }
         }

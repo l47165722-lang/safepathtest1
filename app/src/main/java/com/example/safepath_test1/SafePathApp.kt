@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.location.LocationListener
 import android.location.LocationManager
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -17,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.mapSaver
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.safepath_test1.model.GeoPoint
+import com.example.safepath_test1.model.PlaceSelection
 import com.example.safepath_test1.ui.SafePathTab
 import com.example.safepath_test1.ui.components.SafePathBottomBar
 import com.example.safepath_test1.ui.guardian.GuardianScreen
@@ -38,8 +41,8 @@ fun SafePathApp() {
     val context = LocalContext.current
     var selectedTab by rememberSaveable { mutableStateOf(SafePathTab.Home.name) }
     var currentLocation by remember { mutableStateOf<GeoPoint?>(null) }
-    var origin by rememberSaveable { mutableStateOf("") }
-    var destination by rememberSaveable { mutableStateOf("") }
+    var origin by rememberSaveable(stateSaver = placeSelectionSaver) { mutableStateOf(PlaceSelection()) }
+    var destination by rememberSaveable(stateSaver = placeSelectionSaver) { mutableStateOf(PlaceSelection()) }
     var hasLocationPermission by remember {
         mutableStateOf(hasLocationPermission(context))
     }
@@ -89,7 +92,8 @@ fun SafePathApp() {
                         locationManager.requestLocationUpdates(provider, 1_000L, 1f, listener)
                     }
                 }
-            } catch (_: SecurityException) {
+            } catch (exception: SecurityException) {
+                Log.e("SafePathApp", "Location permission was revoked while requesting updates", exception)
                 currentLocation = null
             }
 
@@ -113,6 +117,11 @@ fun SafePathApp() {
                     destination = destination,
                     onOriginChanged = { origin = it },
                     onDestinationChanged = { destination = it },
+                    onSwap = {
+                        val previousOrigin = origin
+                        origin = destination
+                        destination = previousOrigin
+                    },
                     modifier = Modifier.fillMaxSize(),
                 )
                 SafePathTab.SafetyMap -> SafetyMapScreen(
@@ -140,6 +149,11 @@ fun SafePathApp() {
         }
     }
 }
+
+private val placeSelectionSaver = mapSaver(
+    save = { place -> mapOf("name" to place.name, "latitude" to place.latitude, "longitude" to place.longitude) },
+    restore = { values -> PlaceSelection(values["name"] as String, values["latitude"] as Double?, values["longitude"] as Double?) },
+)
 
 private fun hasLocationPermission(context: android.content.Context): Boolean {
     return ContextCompat.checkSelfPermission(

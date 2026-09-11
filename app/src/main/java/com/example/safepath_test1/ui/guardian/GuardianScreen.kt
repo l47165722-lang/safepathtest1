@@ -1,6 +1,7 @@
 package com.example.safepath_test1.ui.guardian
 
 import android.widget.Toast
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -562,7 +563,8 @@ private fun InputCard(
                                 view.setText(value)
                                 try {
                                     view.setSelection(cursor)
-                                } catch (_: Exception) {
+                                } catch (exception: Exception) {
+                                    Log.w("GuardianScreen", "Restoring text cursor failed; moving it to the end", exception)
                                     view.setSelection(view.text.length)
                                 }
                             }
