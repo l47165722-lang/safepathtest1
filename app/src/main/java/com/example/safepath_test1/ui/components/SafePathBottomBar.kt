@@ -1,322 +1,178 @@
 package com.example.safepath_test1.ui.components
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.safepath_test1.ui.SafePathTab
+import com.example.safepath_test1.ui.theme.DestRed
+import com.example.safepath_test1.ui.theme.SafeBlue
 import com.example.safepath_test1.ui.theme.TextMuted
-import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.roundToInt
-import kotlinx.coroutines.launch
-
-private val GlassShape = RoundedCornerShape(28.dp)
-private val DropletShape = RoundedCornerShape(50)
 
 @Composable
 fun SafePathBottomBar(
     selectedTab: SafePathTab,
     onTabSelected: (SafePathTab) -> Unit,
+    onSosClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    val tabs = SafePathTab.entries
+
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color.White)
-            .navigationBarsPadding()
-            .padding(horizontal = 18.dp, vertical = 8.dp),
+            .navigationBarsPadding(),
+        contentAlignment = Alignment.BottomCenter
     ) {
-        LiquidGlassTabBar(
-            selectedTab = selectedTab,
-            onTabSelected = onTabSelected,
-        )
+        // Bottom Bar Background Card (Unified 20.dp Radius, subtle 4.dp shadow)
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
+                .shadow(4.dp, RoundedCornerShape(20.dp)),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // Left Tabs (0: Home, 1: SafetyMap)
+                Row(modifier = Modifier.weight(1f)) {
+                    TabItem(
+                        tab = tabs[0],
+                        isSelected = selectedTab == tabs[0],
+                        onClick = { onTabSelected(tabs[0]) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    TabItem(
+                        tab = tabs[1],
+                        isSelected = selectedTab == tabs[1],
+                        onClick = { onTabSelected(tabs[1]) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                // Center Spacer for SOS Floating Button
+                Spacer(modifier = Modifier.width(68.dp))
+
+                // Right Tabs (2: Guardian, 3: Profile)
+                Row(modifier = Modifier.weight(1f)) {
+                    TabItem(
+                        tab = tabs[2],
+                        isSelected = selectedTab == tabs[2],
+                        onClick = { onTabSelected(tabs[2]) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    TabItem(
+                        tab = tabs[3],
+                        isSelected = selectedTab == tabs[3],
+                        onClick = { onTabSelected(tabs[3]) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+
+        // Center Floating SOS Button
+        Surface(
+            modifier = Modifier
+                .padding(bottom = 32.dp)
+                .size(72.dp)
+                .shadow(6.dp, CircleShape)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onSosClick
+                ),
+            shape = CircleShape,
+            color = DestRed,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Warning,
+                        contentDescription = "SOS",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = "SOS",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun LiquidGlassTabBar(
-    selectedTab: SafePathTab,
-    onTabSelected: (SafePathTab) -> Unit,
+private fun TabItem(
+    tab: SafePathTab,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val density = LocalDensity.current
-    val scope = rememberCoroutineScope()
-    val tabs = SafePathTab.entries
-
-    var tabOffsetsPx by remember { mutableStateOf(FloatArray(tabs.size)) }
-    var tabWidthsPx by remember { mutableStateOf(FloatArray(tabs.size)) }
-    var layoutReady by remember { mutableStateOf(false) }
-    var isDragging by remember { mutableStateOf(false) }
-    var pressedIndex by remember { mutableIntStateOf(selectedTab.ordinal) }
-    var trackFraction by remember { mutableFloatStateOf(selectedTab.ordinal.toFloat()) }
-
-    val indicatorX = remember { Animatable(0f) }
-    val indicatorWidth = remember { Animatable(0f) }
-    var dragX by remember { mutableFloatStateOf(0f) }
-    var dragWidth by remember { mutableFloatStateOf(0f) }
-
-    val displayX = if (isDragging) dragX else indicatorX.value
-    val displayWidth = if (isDragging) dragWidth else indicatorWidth.value
-
-    fun layoutForFraction(fraction: Float): Pair<Float, Float> {
-        if (tabs.size == 1) {
-            return (tabOffsetsPx[0] + tabWidthsPx[0] * 0.1f) to (tabWidthsPx[0] * 0.8f)
-        }
-        val clamped = fraction.coerceIn(0f, tabs.lastIndex.toFloat())
-        val left = clamped.toInt().coerceIn(0, tabs.lastIndex - 1)
-        val right = (left + 1).coerceAtMost(tabs.lastIndex)
-        val t = (clamped - left).coerceIn(0f, 1f)
-        val x = lerp(
-            tabOffsetsPx[left] + tabWidthsPx[left] * 0.1f,
-            tabOffsetsPx[right] + tabWidthsPx[right] * 0.1f,
-            t,
-        )
-        val baseW = lerp(tabWidthsPx[left] * 0.8f, tabWidthsPx[right] * 0.8f, t)
-        val stretch = 1f + 0.22f * (1f - abs(t - 0.5f) * 2f)
-        return x to (baseW * stretch)
-    }
-
-    fun fractionForTouchX(touchX: Float): Float {
-        if (tabs.size == 1) return 0f
-        val centers = FloatArray(tabs.size) { index ->
-            tabOffsetsPx[index] + tabWidthsPx[index] / 2f
-        }
-        if (touchX <= centers.first()) return 0f
-        if (touchX >= centers.last()) return tabs.lastIndex.toFloat()
-        for (index in 0 until tabs.lastIndex) {
-            val start = centers[index]
-            val end = centers[index + 1]
-            if (touchX in start..end) {
-                return index + ((touchX - start) / (end - start))
-            }
-        }
-        return selectedTab.ordinal.toFloat()
-    }
-
-    fun nearestTab(fraction: Float): SafePathTab {
-        return tabs[fraction.roundToInt().coerceIn(0, tabs.lastIndex)]
-    }
-
-    LaunchedEffect(selectedTab, layoutReady, isDragging) {
-        if (!layoutReady || isDragging) return@LaunchedEffect
-        val index = selectedTab.ordinal
-        val targetX = tabOffsetsPx[index] + tabWidthsPx[index] * 0.1f
-        val targetW = tabWidthsPx[index] * 0.8f
-        if (targetW <= 0f) return@LaunchedEffect
-
-        trackFraction = index.toFloat()
-        pressedIndex = index
-
-        val travel = abs(targetX - indicatorX.value)
-        val stretchWidth = max(targetW, targetW + travel * 0.28f)
-
-        if (indicatorWidth.value == 0f) {
-            indicatorX.snapTo(targetX)
-            indicatorWidth.snapTo(targetW)
-            return@LaunchedEffect
-        }
-
-        launch {
-            indicatorX.animateTo(
-                targetValue = targetX,
-                animationSpec = spring(
-                    dampingRatio = 0.72f,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
-            )
-        }
-        launch {
-            indicatorWidth.animateTo(
-                targetValue = stretchWidth,
-                animationSpec = spring(
-                    dampingRatio = 0.86f,
-                    stiffness = Spring.StiffnessMedium,
-                ),
-            )
-            indicatorWidth.animateTo(
-                targetValue = targetW,
-                animationSpec = spring(
-                    dampingRatio = 0.68f,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
-            )
-        }
-    }
-
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(58.dp)
-            .shadow(
-                elevation = 18.dp,
-                shape = GlassShape,
-                ambientColor = Color.Black.copy(alpha = 0.10f),
-                spotColor = Color.Black.copy(alpha = 0.18f),
+        modifier = modifier
+            .padding(horizontal = 2.dp)
+            .background(
+                color = if (isSelected) SafeBlue else Color.Transparent,
+                shape = RoundedCornerShape(12.dp),
             )
-            .clip(GlassShape)
-            .background(Color.White)
-            .border(
-                width = 1.dp,
-                color = Color(0xFFE5E7EB),
-                shape = GlassShape,
-            )
-            .padding(4.dp)
-            .pointerInput(layoutReady) {
-                if (!layoutReady) return@pointerInput
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    scope.launch { indicatorX.stop(); indicatorWidth.stop() }
-
-                    fun followTouch(touchX: Float) {
-                        val fraction = fractionForTouchX(touchX)
-                        trackFraction = fraction
-                        pressedIndex = nearestTab(fraction).ordinal
-                        val (x, w) = layoutForFraction(fraction)
-                        dragX = x
-                        dragWidth = w
-                    }
-
-                    followTouch(down.position.x)
-                    isDragging = true
-                    down.consume()
-
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (!change.pressed) {
-                            change.consume()
-                            break
-                        }
-                        followTouch(change.position.x)
-                        change.consume()
-                    }
-
-                    val target = nearestTab(trackFraction)
-                    val settleX = dragX
-                    val settleW = dragWidth
-                    isDragging = false
-                    scope.launch {
-                        indicatorX.snapTo(settleX)
-                        indicatorWidth.snapTo(settleW)
-                        onTabSelected(target)
-                    }
-                }
-            },
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        if (layoutReady && displayWidth > 0f) {
-            Box(
-                modifier = Modifier
-                    .offset { IntOffset(displayX.roundToInt(), 0) }
-                    .width(with(density) { displayWidth.toDp() })
-                    .height(42.dp)
-                    .align(Alignment.CenterStart)
-                    .shadow(
-                        elevation = 8.dp,
-                        shape = DropletShape,
-                        ambientColor = Color.Gray,
-                        spotColor = Color.DarkGray,
-                    )
-                    .clip(DropletShape)
-                    .background(Color(0xFF6B7280)),
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            tabs.forEach { tab ->
-                val highlighted = pressedIndex == tab.ordinal
-                val contentColor by animateColorAsState(
-                    targetValue = if (highlighted) Color.White else TextMuted,
-                    animationSpec = spring(stiffness = Spring.StiffnessMedium),
-                    label = "tabContentColor",
-                )
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .onGloballyPositioned { coordinates ->
-                            val index = tab.ordinal
-                            val nextOffsets = tabOffsetsPx.copyOf()
-                            val nextWidths = tabWidthsPx.copyOf()
-                            nextOffsets[index] = coordinates.positionInParent().x
-                            nextWidths[index] = coordinates.size.width.toFloat()
-                            if (!nextOffsets.contentEquals(tabOffsetsPx) ||
-                                !nextWidths.contentEquals(tabWidthsPx)
-                            ) {
-                                tabOffsetsPx = nextOffsets
-                                tabWidthsPx = nextWidths
-                            }
-                            if (nextWidths.all { it > 0f }) {
-                                layoutReady = true
-                            }
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(1.dp),
-                    ) {
-                        Text(
-                            text = tab.icon,
-                            fontSize = 16.sp,
-                            color = contentColor,
-                        )
-                        Text(
-                            text = tab.label,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = contentColor,
-                        )
-                    }
-                }
-            }
+            Icon(
+                imageVector = tab.icon,
+                contentDescription = tab.label,
+                tint = if (isSelected) Color.White else TextMuted,
+                modifier = Modifier.size(20.dp)
+            )
+            Text(
+                text = tab.label,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isSelected) Color.White else TextMuted,
+            )
         }
     }
-}
-
-private fun lerp(start: Float, stop: Float, fraction: Float): Float {
-    return start + (stop - start) * fraction
 }

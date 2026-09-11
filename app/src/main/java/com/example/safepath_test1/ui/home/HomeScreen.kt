@@ -1,8 +1,8 @@
 package com.example.safepath_test1.ui.home
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,14 +18,20 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.BottomSheetScaffold
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -34,11 +40,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,10 +60,10 @@ import com.example.safepath_test1.ui.theme.SafeBlue
 import com.example.safepath_test1.ui.theme.TextMain
 import com.example.safepath_test1.ui.theme.TextMuted
 
-private enum class RouteType(val title: String, val icon: String) {
-    Safe("안전", "🛡"),
-    Shortest("최단", "⚡"),
-    Recommended("추천", "★"),
+private enum class RouteType(val title: String, val icon: ImageVector) {
+    Safe("안전", Icons.Default.Lock),
+    Shortest("최단", Icons.Default.Info),
+    Recommended("추천", Icons.Default.Star),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,230 +77,91 @@ fun HomeScreen(
     onDestinationChanged: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     var routeType by rememberSaveable { mutableStateOf(RouteType.Safe.name) }
     var recenterToken by remember { mutableIntStateOf(0) }
     var showSafetyFacilities by rememberSaveable { mutableStateOf(true) }
-    val sheetState = rememberBottomSheetScaffoldState()
+    var destinationPoint by remember { mutableStateOf<com.mapbox.geojson.Point?>(null) }
+    var multiRouteResult by remember { mutableStateOf<com.example.safepath_test1.location.MultiRouteResult?>(null) }
 
-    BottomSheetScaffold(
-        modifier = modifier.fillMaxSize(),
-        scaffoldState = sheetState,
-        sheetPeekHeight = 220.dp,
-        sheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        sheetContainerColor = Color.White.copy(alpha = 0.96f),
-        sheetShadowElevation = 14.dp,
-        sheetContent = {
-            RouteBottomSheet(
-                destination = destination,
-                routeType = RouteType.valueOf(routeType),
-            )
-        },
-    ) { _ ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            SafePathMapboxView(
-                currentLocation = currentLocation,
-                hasLocationPermission = hasLocationPermission,
-                recenterToken = recenterToken,
-                modifier = Modifier.fillMaxSize(),
-            )
-
-            RouteSearchCard(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(horizontal = 14.dp, vertical = 2.dp),
-                origin = origin,
-                destination = destination,
-                onOriginChanged = onOriginChanged,
-                onDestinationChanged = onDestinationChanged,
-                onSwap = {
-                    val previousOrigin = origin
-                    onOriginChanged(destination)
-                    onDestinationChanged(previousOrigin)
-                },
-                selectedRouteType = RouteType.valueOf(routeType),
-                onRouteTypeSelected = { routeType = it.name },
-            )
-
-            MapSideControls(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 10.dp),
-                locationEnabled = hasLocationPermission,
-                safetyFacilitiesEnabled = showSafetyFacilities,
-                onRecenter = { recenterToken++ },
-                onToggleSafetyFacilities = {
-                    showSafetyFacilities = !showSafetyFacilities
-                },
-            )
+    LaunchedEffect(destinationPoint, currentLocation) {
+        val point = destinationPoint ?: run {
+            multiRouteResult = null
+            return@LaunchedEffect
         }
-    }
-}
+        val token = context.getString(com.example.safepath_test1.R.string.mapbox_access_token)
+        val originLat = currentLocation?.latitude ?: 35.8572
+        val originLng = currentLocation?.longitude ?: 128.5712
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun RouteBottomSheet(
-    destination: String,
-    routeType: RouteType,
-) {
-    val context = LocalContext.current
-    val hasDestination = destination.isNotBlank()
-    val routeMinutes = when (routeType) {
-        RouteType.Safe -> 24
-        RouteType.Shortest -> 20
-        RouteType.Recommended -> 22
-    }
-    val routeDistance = when (routeType) {
-        RouteType.Safe -> "1.8 km"
-        RouteType.Shortest -> "1.6 km"
-        RouteType.Recommended -> "1.7 km"
+        val result = com.example.safepath_test1.location.NavigationRepository.fetchMultiRoutes(
+            accessToken = token,
+            originLat = originLat,
+            originLng = originLng,
+            destLat = point.latitude(),
+            destLng = point.longitude(),
+        )
+        multiRouteResult = result
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        if (!hasDestination) {
-            Text(
-                text = "목적지를 설정해 주세요",
-                style = MaterialTheme.typography.titleLarge,
-                color = TextMain,
-            )
-            Text(
-                text = "목적지를 입력하면 안전도와 주변 안전시설을 확인할 수 있어요.",
-                color = TextMuted,
-                fontSize = 12.sp,
-            )
-            PrimaryAction(
-                text = "목적지 검색",
-                onClick = {
-                    Toast.makeText(context, "상단 도착지 입력창을 이용해 주세요.", Toast.LENGTH_SHORT).show()
-                },
-            )
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = destination,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = TextMain,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = "${routeType.icon} ${routeType.title} 경로 · ${routeMinutes}분 · $routeDistance",
-                        color = TextMuted,
-                        fontSize = 13.sp,
-                    )
-                }
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFEAF8F1),
-                ) {
-                    Text(
-                        text = "매우 안전",
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        color = Color(0xFF15803D),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("안전도", color = TextMain, fontWeight = FontWeight.SemiBold)
-                HorizontalGap(8.dp)
-                LinearProgressIndicator(
-                    progress = { 0.87f },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(8.dp)
-                        .clip(CircleShape),
-                    color = Color(0xFF22C55E),
-                    trackColor = FieldBg,
-                )
-                HorizontalGap(8.dp)
-                Text("87", color = Color(0xFF15803D), fontWeight = FontWeight.Bold)
-            }
-
-            Text(
-                text = "안전시설을 많이 지나고, 밝은 도로를 우선하는 경로예요.",
-                color = TextMuted,
-                fontSize = 12.sp,
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                SafetyMetric("📷", "CCTV", "18개", Modifier.weight(1f))
-                SafetyMetric("💡", "가로등", "34개", Modifier.weight(1f))
-                SafetyMetric("📍", "경찰시설", "2개", Modifier.weight(1f))
-            }
-
-            PrimaryAction(
-                text = "${routeType.title} 경로로 출발",
-                onClick = {
-                    Toast.makeText(context, "경로 안내는 서버 연결 후 제공됩니다.", Toast.LENGTH_SHORT).show()
-                },
-            )
-        }
-
-        // Keeps sheet actions clear of the floating app navigation.
-        Spacer(modifier = Modifier.height(92.dp))
+    val activeRoute = when (routeType) {
+        RouteType.Safe.name -> multiRouteResult?.safeRoute
+        RouteType.Shortest.name -> multiRouteResult?.shortestRoute
+        else -> multiRouteResult?.recommendedRoute
     }
-}
 
-@Composable
-private fun SafetyMetric(
-    icon: String,
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        color = FieldBg,
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(icon, fontSize = 15.sp)
-            Text(value, color = TextMain, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            Text(label, color = TextMuted, fontSize = 10.sp)
-        }
+    val activeRouteColor = when (routeType) {
+        RouteType.Safe.name -> "#22C55E" // Safe Green
+        RouteType.Shortest.name -> "#F59E0B" // Shortest Amber
+        else -> "#2563EB" // Recommended Blue
     }
-}
 
-@Composable
-private fun PrimaryAction(
-    text: String,
-    onClick: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(42.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        color = SafeBlue,
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = text,
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-            )
-        }
+    Box(modifier = modifier.fillMaxSize()) {
+        SafePathMapboxView(
+            currentLocation = currentLocation,
+            hasLocationPermission = hasLocationPermission,
+            recenterToken = recenterToken,
+            showSafetyFacilities = showSafetyFacilities,
+            destinationPoint = destinationPoint,
+            routeLineGeoJson = activeRoute?.geoJsonLineString,
+            routeLineColor = activeRouteColor,
+            onMapClick = { point ->
+                destinationPoint = point
+                val latStr = String.format(java.util.Locale.US, "%.4f", point.latitude())
+                val lngStr = String.format(java.util.Locale.US, "%.4f", point.longitude())
+                onDestinationChanged("선택한 장소 ($latStr, $lngStr)")
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+
+        RouteSearchCard(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(horizontal = 14.dp, vertical = 2.dp),
+            origin = origin,
+            destination = destination,
+            onOriginChanged = onOriginChanged,
+            onDestinationChanged = onDestinationChanged,
+            onSwap = {
+                val previousOrigin = origin
+                onOriginChanged(destination)
+                onDestinationChanged(previousOrigin)
+            },
+            selectedRouteType = RouteType.valueOf(routeType),
+            onRouteTypeSelected = { routeType = it.name },
+        )
+
+        MapSideControls(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 12.dp),
+            locationEnabled = hasLocationPermission,
+            safetyFacilitiesEnabled = showSafetyFacilities,
+            onRecenter = { recenterToken++ },
+            onToggleSafetyFacilities = {
+                showSafetyFacilities = !showSafetyFacilities
+            },
+        )
     }
 }
 
@@ -307,16 +176,18 @@ private fun RouteSearchCard(
     selectedRouteType: RouteType,
     onRouteTypeSelected: (RouteType) -> Unit,
 ) {
+    var activeTab by rememberSaveable { mutableStateOf("destination") }
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(6.dp, RoundedCornerShape(18.dp)),
-        shape = RoundedCornerShape(18.dp),
-        color = Color.White.copy(alpha = 0.96f),
+            .shadow(4.dp, RoundedCornerShape(20.dp)),
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White.copy(alpha = 0.98f),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -324,18 +195,18 @@ private fun RouteSearchCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(24.dp)
-                        .clip(RoundedCornerShape(7.dp))
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(8.dp))
                         .background(SafeBlue),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("S", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("S", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
-                HorizontalGap(7.dp)
+                Spacer(Modifier.width(8.dp))
                 Text(
                     text = "SafePath",
                     color = TextMain,
-                    fontSize = 16.sp,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -348,34 +219,71 @@ private fun RouteSearchCard(
                     leading = {
                         Box(
                             modifier = Modifier
-                                .size(7.dp)
+                                .size(9.dp)
                                 .clip(CircleShape)
                                 .background(SafeBlue),
                         )
                     },
                     value = origin,
                     placeholder = "내 위치",
+                    isSelected = activeTab == "origin",
+                    onSelect = { activeTab = "origin" },
                     onValueChange = onOriginChanged,
+                    trailing = {
+                        Surface(
+                            modifier = Modifier
+                                .size(26.dp)
+                                .clickable {
+                                    activeTab = "origin"
+                                    onOriginChanged("내 위치")
+                                },
+                            shape = CircleShape,
+                            color = SafeBlue.copy(alpha = 0.12f),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.MyLocation,
+                                    contentDescription = "내 위치 설정",
+                                    tint = SafeBlue,
+                                    modifier = Modifier.size(15.dp),
+                                )
+                            }
+                        }
+                    },
                     modifier = Modifier.weight(1f),
                 )
 
                 Surface(
                     modifier = Modifier
-                        .padding(horizontal = 5.dp)
-                        .size(28.dp)
+                        .padding(horizontal = 6.dp)
+                        .size(36.dp)
                         .clickable(onClick = onSwap),
                     shape = CircleShape,
                     color = FieldBg,
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text("⇄", color = SafeBlue, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "스왑",
+                            tint = SafeBlue,
+                            modifier = Modifier.size(20.dp),
+                        )
                     }
                 }
 
                 RouteFieldRow(
-                    leading = { Text("📍", fontSize = 11.sp, color = DestRed) },
+                    leading = {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = "도착지",
+                            tint = DestRed,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    },
                     value = destination,
                     placeholder = "도착지",
+                    isSelected = activeTab == "destination",
+                    onSelect = { activeTab = "destination" },
                     onValueChange = onDestinationChanged,
                     modifier = Modifier.weight(1f),
                 )
@@ -386,7 +294,7 @@ private fun RouteSearchCard(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(FieldBg)
-                    .padding(2.dp),
+                    .padding(3.dp),
             ) {
                 RouteType.entries.forEach { type ->
                     RouteTypeChip(
@@ -406,46 +314,87 @@ private fun RouteFieldRow(
     leading: @Composable () -> Unit,
     value: String,
     placeholder: String,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
     onValueChange: (String) -> Unit,
+    trailing: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    val backgroundColor = if (isSelected) Color.White else FieldBg
+    val borderColor = if (isSelected) SafeBlue else Color.Transparent
+
+    Surface(
         modifier = modifier
-            .clip(RoundedCornerShape(9.dp))
-            .background(FieldBg)
-            .padding(horizontal = 9.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .shadow(if (isSelected) 2.dp else 0.dp, RoundedCornerShape(12.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onSelect,
+            ),
+        shape = RoundedCornerShape(12.dp),
+        color = backgroundColor,
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, borderColor),
     ) {
         Box(
-            modifier = Modifier.size(14.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            leading()
-        }
-        HorizontalGap(5.dp)
-        Box(modifier = Modifier.weight(1f)) {
-            if (value.isBlank()) {
-                Text(
-                    text = placeholder,
-                    color = TextMuted,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                singleLine = true,
-                textStyle = TextStyle(
-                    color = TextMain,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onSelect,
                 ),
-                cursorBrush = SolidColor(SafeBlue),
-                modifier = Modifier.fillMaxWidth(),
-            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier.size(16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    leading()
+                }
+                Spacer(Modifier.width(6.dp))
+                Box(modifier = Modifier.weight(1f)) {
+                    if (value.isBlank()) {
+                        Text(
+                            text = placeholder,
+                            color = if (isSelected) TextMain else TextMuted,
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    BasicTextField(
+                        value = value,
+                        onValueChange = {
+                            onSelect()
+                            onValueChange(it)
+                        },
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            color = TextMain,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                        cursorBrush = SolidColor(Color.Transparent),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { focusState ->
+                                if (focusState.isFocused) {
+                                    onSelect()
+                                }
+                            },
+                    )
+                }
+                if (trailing != null) {
+                    Spacer(Modifier.width(6.dp))
+                    trailing()
+                }
+            }
         }
     }
 }
@@ -461,19 +410,24 @@ private fun RouteTypeChip(
     val content = if (selected) Color.White else TextMuted
     Row(
         modifier = modifier
-            .height(32.dp)
+            .height(36.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(background)
             .clickable(onClick = onClick),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(type.icon, fontSize = 11.sp, color = content)
-        HorizontalGap(4.dp)
+        Icon(
+            imageVector = type.icon,
+            contentDescription = type.title,
+            tint = content,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(Modifier.width(5.dp))
         Text(
             text = type.title,
             color = content,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
         )
     }
@@ -492,13 +446,13 @@ private fun MapSideControls(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         RoundMapButton(
-            label = "◎",
+            icon = Icons.Default.LocationOn,
             enabled = locationEnabled,
             selected = false,
             onClick = onRecenter,
         )
         RoundMapButton(
-            label = "🛡",
+            icon = Icons.Default.Lock,
             enabled = true,
             selected = safetyFacilitiesEnabled,
             onClick = onToggleSafetyFacilities,
@@ -508,7 +462,7 @@ private fun MapSideControls(
 
 @Composable
 private fun RoundMapButton(
-    label: String,
+    icon: ImageVector,
     enabled: Boolean,
     selected: Boolean,
     onClick: () -> Unit,
@@ -516,27 +470,22 @@ private fun RoundMapButton(
     Surface(
         modifier = Modifier
             .size(42.dp)
-            .shadow(5.dp, CircleShape)
+            .shadow(4.dp, CircleShape)
             .clickable(enabled = enabled, onClick = onClick),
         shape = CircleShape,
         color = if (selected) SafeBlue else Color.White,
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = label,
-                color = when {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = when {
                     selected -> Color.White
                     enabled -> SafeBlue
                     else -> Color.Gray
                 },
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
+                modifier = Modifier.size(20.dp),
             )
         }
     }
-}
-
-@Composable
-private fun HorizontalGap(width: androidx.compose.ui.unit.Dp) {
-    Spacer(modifier = Modifier.width(width))
 }

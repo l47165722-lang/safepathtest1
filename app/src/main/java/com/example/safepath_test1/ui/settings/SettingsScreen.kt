@@ -9,14 +9,23 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -34,11 +43,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.safepath_test1.ui.components.PageHeader
 import com.example.safepath_test1.ui.theme.AppBorder
+import com.example.safepath_test1.ui.theme.SafeBlue
 import com.example.safepath_test1.ui.theme.TextMuted
 
 @Composable
 fun SettingsScreen(
     hasLocationPermission: Boolean,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -55,8 +66,27 @@ fun SettingsScreen(
             .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
+        if (onBack != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .clickable { onBack() }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "뒤로가기",
+                    tint = SafeBlue,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text("내 정보로 돌아가기", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = SafeBlue)
+            }
+        }
         PageHeader("설정", "안전 기능과 위치 권한을 관리하세요")
         SettingsGroup(
             rows = listOf(
@@ -76,7 +106,7 @@ fun SettingsScreen(
         )
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
+            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         ) {
@@ -91,18 +121,75 @@ fun SettingsScreen(
                         },
                     )
                 }
-                HorizontalDivider(
-                    Modifier.padding(horizontal = 16.dp),
-                    color = AppBorder,
-                )
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = AppBorder)
+                SettingsLinkRow(
+                    title = "마이크 권한 (긴급 녹음)",
+                    value = if (hasMicPermission(context)) "허용됨" else "허용 필요",
+                ) {
+                    requestPermission(context, android.Manifest.permission.RECORD_AUDIO)
+                }
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = AppBorder)
+                SettingsLinkRow(
+                    title = "카메라 권한 (주변 촬영)",
+                    value = if (hasCameraPermission(context)) "허용됨" else "허용 필요",
+                ) {
+                    requestPermission(context, android.Manifest.permission.CAMERA)
+                }
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = AppBorder)
                 SettingsLinkRow("개인정보 처리방침", "준비 중")
-                HorizontalDivider(
-                    Modifier.padding(horizontal = 16.dp),
-                    color = AppBorder,
-                )
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = AppBorder)
                 SettingsLinkRow("앱 버전", "1.0.0")
             }
         }
+
+        Text("테스트 기능 (디버깅)", color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        ) {
+            Column {
+                SettingsLinkRow(
+                    title = "SOS 팝업 테스트",
+                    value = "실행",
+                ) {
+                    android.widget.Toast.makeText(context, "SOS 기능 테스트 실행 완료", android.widget.Toast.LENGTH_SHORT).show()
+                }
+                HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = AppBorder)
+                SettingsLinkRow(
+                    title = "UI 알림 발생",
+                    value = "실행",
+                ) {
+                    android.widget.Toast.makeText(context, "가상의 위험 지역 진입 알림!", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+}
+
+private fun hasMicPermission(context: Context): Boolean {
+    return androidx.core.content.ContextCompat.checkSelfPermission(
+        context, android.Manifest.permission.RECORD_AUDIO
+    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+}
+
+private fun hasCameraPermission(context: Context): Boolean {
+    return androidx.core.content.ContextCompat.checkSelfPermission(
+        context, android.Manifest.permission.CAMERA
+    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+}
+
+private fun requestPermission(context: Context, permission: String) {
+    if (context is android.app.Activity) {
+        androidx.core.app.ActivityCompat.requestPermissions(context, arrayOf(permission), 100)
+    } else {
+        context.startActivity(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        )
     }
 }
 
@@ -112,7 +199,7 @@ private fun SettingsGroup(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
@@ -153,7 +240,7 @@ private fun SettingsLinkRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = onClick != null) { onClick?.invoke() }
-            .padding(horizontal = 18.dp, vertical = 16.dp),
+            .padding(horizontal = 18.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -164,7 +251,13 @@ private fun SettingsLinkRow(
         )
         Text(value, color = TextMuted, fontSize = 13.sp)
         if (onClick != null) {
-            Text("  ›", color = TextMuted, fontSize = 20.sp)
+            Spacer(Modifier.width(6.dp))
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = TextMuted,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }

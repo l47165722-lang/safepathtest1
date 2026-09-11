@@ -28,7 +28,8 @@ import com.example.safepath_test1.ui.SafePathTab
 import com.example.safepath_test1.ui.components.SafePathBottomBar
 import com.example.safepath_test1.ui.guardian.GuardianScreen
 import com.example.safepath_test1.ui.home.HomeScreen
-import com.example.safepath_test1.ui.settings.SettingsScreen
+import com.example.safepath_test1.ui.profile.ProfileScreen
+import com.example.safepath_test1.ui.safetymap.SafetyMapScreen
 import com.example.safepath_test1.ui.theme.AppBackground
 import com.example.safepath_test1.ui.theme.SafePathTheme
 
@@ -50,6 +51,12 @@ fun SafePathApp() {
     }
 
     LaunchedEffect(Unit) {
+        // Pre-load safety facilities in background thread (IO) so map displays them instantly on open
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.example.safepath_test1.location.SafetyRepository.getCctvGeoJson(context)
+            com.example.safepath_test1.location.SafetyRepository.getStreetlightGeoJson(context)
+        }
+
         if (!hasLocationPermission) {
             permissionLauncher.launch(
                 arrayOf(
@@ -108,19 +115,26 @@ fun SafePathApp() {
                     onDestinationChanged = { destination = it },
                     modifier = Modifier.fillMaxSize(),
                 )
+                SafePathTab.SafetyMap -> SafetyMapScreen(
+                    currentLocation = currentLocation,
+                    modifier = Modifier.padding(bottom = 100.dp),
+                )
                 SafePathTab.Guardian -> GuardianScreen(
                     currentLocation = currentLocation,
-                    modifier = Modifier.padding(bottom = 88.dp),
+                    modifier = Modifier.padding(bottom = 100.dp),
                 )
-                SafePathTab.Settings -> SettingsScreen(
+                SafePathTab.Profile -> ProfileScreen(
                     hasLocationPermission = hasLocationPermission,
-                    modifier = Modifier.padding(bottom = 88.dp),
+                    modifier = Modifier.padding(bottom = 100.dp),
                 )
             }
 
             SafePathBottomBar(
                 selectedTab = tab,
                 onTabSelected = { selectedTab = it.name },
+                onSosClick = {
+                    android.widget.Toast.makeText(context, "🚨 SOS 호출! (준비 중)", android.widget.Toast.LENGTH_SHORT).show()
+                },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
