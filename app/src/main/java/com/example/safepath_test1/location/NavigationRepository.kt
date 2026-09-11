@@ -22,7 +22,15 @@ object NavigationRepository {
         val candidates = fetchWalkingRoutes(accessToken, originLat, originLng, destLat, destLng)
         val shortestRoute = candidates.minByOrNull { it.distanceMeters } ?: return@withContext MultiRouteResult(null, null, null)
         val scoredCandidates = try {
-            candidates.map { it.copy(safetyFacilityScore = SafetyRepository.scoreRouteFacilities(context, it.geoJsonLineString)) }
+            candidates.map {
+                it.copy(
+                    safetyFacilityScore = SafetyRepository.scoreRouteFacilities(
+                        context = context,
+                        routeGeoJson = it.geoJsonLineString,
+                        routeDistanceMeters = it.distanceMeters,
+                    ),
+                )
+            }
         } catch (exception: Exception) {
             Log.e(tag, "Failed to score walking routes with safety facilities; using shortest route", exception)
             return@withContext MultiRouteResult(shortestRoute, shortestRoute, shortestRoute)

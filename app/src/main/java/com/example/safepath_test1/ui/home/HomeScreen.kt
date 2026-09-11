@@ -1,5 +1,6 @@
 package com.example.safepath_test1.ui.home
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -83,6 +84,7 @@ fun HomeScreen(
     var routeType by rememberSaveable { mutableStateOf(RouteType.Safe.name) }
     var recenterToken by remember { mutableIntStateOf(0) }
     var showSafetyFacilities by rememberSaveable { mutableStateOf(true) }
+    var activeTab by rememberSaveable { mutableStateOf("destination") }
     var multiRouteResult by remember { mutableStateOf<com.example.safepath_test1.location.MultiRouteResult?>(null) }
     val destinationPoint = if (destination.hasCoordinates()) com.mapbox.geojson.Point.fromLngLat(destination.longitude!!, destination.latitude!!) else null
 
@@ -127,7 +129,15 @@ fun HomeScreen(
             onMapClick = { point ->
                 val latStr = String.format(java.util.Locale.US, "%.4f", point.latitude())
                 val lngStr = String.format(java.util.Locale.US, "%.4f", point.longitude())
-                onDestinationChanged(PlaceSelection("선택한 장소 ($latStr, $lngStr)", point.latitude(), point.longitude()))
+                val selectedPlace = PlaceSelection("선택한 장소 ($latStr, $lngStr)", point.latitude(), point.longitude())
+
+                if (activeTab == "origin") {
+                    onOriginChanged(selectedPlace)
+                    activeTab = "destination"
+                    Toast.makeText(context, "출발지가 설정되었습니다. 이제 도착지를 지정해 주세요.", Toast.LENGTH_SHORT).show()
+                } else {
+                    onDestinationChanged(selectedPlace)
+                }
             },
             modifier = Modifier.fillMaxSize(),
         )
@@ -139,10 +149,23 @@ fun HomeScreen(
                 .padding(horizontal = 14.dp, vertical = 2.dp),
             origin = origin,
             destination = destination,
-            onOriginChanged = onOriginChanged,
+            activeTab = activeTab,
+            onActiveTabChanged = { activeTab = it },
+            onOriginChanged = {
+                onOriginChanged(it)
+                if (it.hasCoordinates() && !destination.hasCoordinates()) {
+                    activeTab = "destination"
+                }
+            },
             onDestinationChanged = onDestinationChanged,
             onSwap = onSwap,
-            onUseCurrentLocation = { currentLocation?.let { onOriginChanged(PlaceSelection("My location", it.latitude, it.longitude)) } },
+            onUseCurrentLocation = {
+                currentLocation?.let {
+                    onOriginChanged(PlaceSelection("내 위치", it.latitude, it.longitude))
+                    activeTab = "destination"
+                    Toast.makeText(context, "출발지가 설정되었습니다. 이제 도착지를 지정해 주세요.", Toast.LENGTH_SHORT).show()
+                }
+            },
             selectedRouteType = RouteType.valueOf(routeType),
             onRouteTypeSelected = { routeType = it.name },
         )
@@ -166,6 +189,8 @@ private fun RouteSearchCard(
     modifier: Modifier = Modifier,
     origin: PlaceSelection,
     destination: PlaceSelection,
+    activeTab: String,
+    onActiveTabChanged: (String) -> Unit,
     onOriginChanged: (PlaceSelection) -> Unit,
     onDestinationChanged: (PlaceSelection) -> Unit,
     onSwap: () -> Unit,
@@ -173,8 +198,6 @@ private fun RouteSearchCard(
     selectedRouteType: RouteType,
     onRouteTypeSelected: (RouteType) -> Unit,
 ) {
-    var activeTab by rememberSaveable { mutableStateOf("destination") }
-
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -224,14 +247,14 @@ private fun RouteSearchCard(
                     value = origin.name,
                     placeholder = "내 위치",
                     isSelected = activeTab == "origin",
-                    onSelect = { activeTab = "origin" },
+                    onSelect = { onActiveTabChanged("origin") },
                     onValueChange = { onOriginChanged(PlaceSelection(name = it)) },
                     trailing = {
                         Surface(
                             modifier = Modifier
                                 .size(26.dp)
                                 .clickable {
-                                    activeTab = "origin"
+                                    onActiveTabChanged("origin")
                                     onUseCurrentLocation()
                                 },
                             shape = CircleShape,
@@ -280,7 +303,7 @@ private fun RouteSearchCard(
                     value = destination.name,
                     placeholder = "도착지",
                     isSelected = activeTab == "destination",
-                    onSelect = { activeTab = "destination" },
+                    onSelect = { onActiveTabChanged("destination") },
                     onValueChange = { onDestinationChanged(PlaceSelection(name = it)) },
                     modifier = Modifier.weight(1f),
                 )

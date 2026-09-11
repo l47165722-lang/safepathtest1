@@ -110,7 +110,11 @@ object SafetyRepository {
         )
     }
 
-    suspend fun scoreRouteFacilities(context: Context, routeGeoJson: String): Double = withContext(Dispatchers.IO) {
+    suspend fun scoreRouteFacilities(
+        context: Context,
+        routeGeoJson: String,
+        routeDistanceMeters: Double,
+    ): Double = withContext(Dispatchers.IO) {
         val routePoints = try {
             val coordinates = org.json.JSONObject(routeGeoJson).optJSONArray("coordinates") ?: return@withContext 0.0
             buildList<SafetyFacility> {
@@ -129,8 +133,9 @@ object SafetyRepository {
         val cctvs = cctvList ?: loadCctv(context).also { cctvList = it }
         val lights = streetlightList ?: loadStreetlights(context).also { streetlightList = it }
         if (cctvs.isEmpty() && lights.isEmpty()) return@withContext 0.0
-        return@withContext cctvs.count { isNearRoute(it, routePoints, 50.0) } * 4.0 +
+        val weightedFacilityCount = cctvs.count { isNearRoute(it, routePoints, 50.0) } * 4.0 +
             lights.count { isNearRoute(it, routePoints, 40.0) }
+        weightedFacilityCount * 1_000.0 / routeDistanceMeters.coerceAtLeast(100.0)
     }
 
     private fun isNearRoute(facility: SafetyFacility, route: List<SafetyFacility>, thresholdMeters: Double): Boolean =
